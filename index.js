@@ -38,8 +38,19 @@ async function run() {
       .collection("foods");
 
     app.get("/foods", async (req, res) => {
-      const result = await foodCollection.find().toArray();
-      res.send(result);
+      const foodName = req.query.name;
+      const query = {};
+      if (foodName) {
+        query.food_name = { $regex: new RegExp(foodName, "i") };
+      }
+
+      try {
+        const result = await foodCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error("Error fetching foods:", error);
+        res.status(500).send("Internal Server Error");
+      }
     });
 
     app.get("/foods/:id", async (req, res) => {
