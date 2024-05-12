@@ -30,7 +30,6 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
     const foodCollection = client
@@ -41,6 +40,23 @@ async function run() {
       .db("restaurantManagement")
       .collection("Purchase");
 
+    //get top selling foods
+    app.get("/topFoods", async (req, res) => {
+      try {
+        const topFoods = await foodCollection
+          .find({})
+          .sort({ purchaseCount: -1 })
+          .limit(6)
+          .toArray();
+
+        res.json(topFoods);
+      } catch (error) {
+        console.error("Error fetching top foods:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
+
+    //get all foods
     app.get("/foods", async (req, res) => {
       const foodName = req.query.name;
       const query = {};
@@ -88,6 +104,19 @@ async function run() {
       }
     });
 
+    const feedbackCollection = client
+      .db("restaurantManagement")
+      .collection("feedbacks");
+
+    app.get("/feedbacks", async (req, res) => {
+      const feedbacks = await feedbackCollection.find().toArray();
+      res.json(feedbacks);
+    });
+
+    app.post("/feedback", async (req, res) => {
+      await feedbackCollection.insertOne(req.body);
+      res.json({ message: "Feedback added" });
+    });
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
