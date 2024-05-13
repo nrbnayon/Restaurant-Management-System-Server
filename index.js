@@ -117,6 +117,21 @@ async function run() {
       await feedbackCollection.insertOne(req.body);
       res.json({ message: "Feedback added" });
     });
+
+    // Route to fetch food items added by the currently logged-in user
+    app.get("/myAddedFoods", async (req, res) => {
+      const { userName, photoUrl } = req.query;
+      try {
+        const myAddedFoods = await foodCollection
+          .find({ userName, photoUrl })
+          .toArray();
+        res.json(myAddedFoods);
+      } catch (error) {
+        console.error("Error fetching user's added foods:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
