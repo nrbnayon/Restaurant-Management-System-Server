@@ -40,6 +40,9 @@ async function run() {
       .db("restaurantManagement")
       .collection("Purchase");
 
+    const feedbackCollection = client
+      .db("restaurantManagement")
+      .collection("feedbacks");
     //get top selling foods
     app.get("/topFoods", async (req, res) => {
       try {
@@ -80,6 +83,32 @@ async function run() {
       res.send(result);
     });
 
+    // app.post("/purchase", async (req, res) => {
+    //   try {
+    //     const purchaseData = req.body;
+
+    //     if (!ObjectId.isValid(purchaseData.foodId)) {
+    //       return res.status(400).json({ error: "Invalid foodId" });
+    //     }
+
+    //     // Insert the purchase data into the Purchase collection
+    //     await purchaseCollection.insertOne(purchaseData);
+
+    //     // Increment purchase count for the corresponding food item
+    //     await foodCollection.updateOne(
+    //       { _id: new ObjectId(purchaseData.foodId) },
+    //       { $inc: { purchaseCount: 1 } }
+    //     );
+
+    //     res.status(201).json({ message: "Purchase data added successfully" });
+    //   } catch (error) {
+    //     console.error("Error adding purchase data:", error);
+    //     res.status(500).json({ error: "Internal Server Error" });
+    //   }
+    // });
+
+    // my purchase
+
     app.post("/purchase", async (req, res) => {
       try {
         const purchaseData = req.body;
@@ -88,14 +117,36 @@ async function run() {
           return res.status(400).json({ error: "Invalid foodId" });
         }
 
-        // Insert the purchase data into the Purchase collection
-        await purchaseCollection.insertOne(purchaseData);
+        const foodId = new ObjectId(purchaseData.foodId);
+
+        // Get the food item details
+        const foodItem = await foodCollection.findOne({ _id: foodId });
+
+        // Check if the quantity of the food item is sufficient for the purchase
+        if (foodItem.quantity < purchaseData.quantity) {
+          return res.status(400).json({ error: "Insufficient quantity" });
+        }
+
+        // Calculate the total sales
+        // const totalSales = foodItem.totalSeals + purchaseData.quantity;
+        const purchaseQuantity = parseInt(purchaseData.quantity);
 
         // Increment purchase count for the corresponding food item
         await foodCollection.updateOne(
-          { _id: new ObjectId(purchaseData.foodId) },
-          { $inc: { purchaseCount: 1 } }
+          { _id: foodId },
+          {
+            $inc: {
+              purchaseCount: 1,
+              totalSeals: purchaseQuantity,
+            },
+            $set: {
+              quantity: foodItem.quantity - purchaseData.quantity,
+            },
+          }
         );
+
+        // Insert the purchase data into the Purchase collection
+        await purchaseCollection.insertOne(purchaseData);
 
         res.status(201).json({ message: "Purchase data added successfully" });
       } catch (error) {
@@ -104,9 +155,26 @@ async function run() {
       }
     });
 
-    const feedbackCollection = client
-      .db("restaurantManagement")
-      .collection("feedbacks");
+    app.get("/myPurchase", async (req, res) => {
+      let query = {};
+      const { buyerName, buyerProfileUrl, buyerEmail } = req.query;
+
+      if (buyerName && buyerProfileUrl) {
+        query = { buyerName, buyerProfileUrl };
+      } else if (buyerEmail !== undefined) {
+        query = { buyerEmail };
+      } else {
+        return res.json([]);
+      }
+
+      try {
+        const myAddedFoods = await purchaseCollection.find(query).toArray();
+        res.json(myAddedFoods);
+      } catch (error) {
+        console.error("Error fetching user's added foods:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
 
     app.get("/feedbacks", async (req, res) => {
       const feedbacks = await feedbackCollection.find().toArray();
@@ -118,19 +186,28 @@ async function run() {
       res.json({ message: "Feedback added" });
     });
 
-    // Route to fetch food items added by the currently logged-in user
     app.get("/myAddedFoods", async (req, res) => {
-      const { userName, photoUrl } = req.query;
+      let query = {};
+      const { userName, photoUrl, userEmail } = req.query;
+
+      if (userName && photoUrl) {
+        query = { userName, photoUrl };
+      } else if (userEmail !== undefined) {
+        query = { userEmail };
+      } else {
+        return res.json([]);
+      }
+
       try {
-        const myAddedFoods = await foodCollection
-          .find({ userName, photoUrl })
-          .toArray();
+        const myAddedFoods = await foodCollection.find(query).toArray();
         res.json(myAddedFoods);
       } catch (error) {
         console.error("Error fetching user's added foods:", error);
         res.status(500).json({ error: "Internal Server Error" });
       }
     });
+
+    //delete added food
     app.post("/myAddedFoods/:id", async (req, res) => {
       try {
         const id = req.params.id;
