@@ -131,6 +131,19 @@ async function run() {
         res.status(500).json({ error: "Internal Server Error" });
       }
     });
+    app.post("/myAddedFoods/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        console.log("delete id", id);
+        const query = { _id: new ObjectId(id) };
+
+        const result = await foodCollection.deleteOne(query);
+        res.send(result);
+      } catch (error) {
+        console.error("Error deleting food item:", error);
+        res.status(500).send("Error deleting food item");
+      }
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
