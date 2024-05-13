@@ -83,32 +83,7 @@ async function run() {
       res.send(result);
     });
 
-    // app.post("/purchase", async (req, res) => {
-    //   try {
-    //     const purchaseData = req.body;
-
-    //     if (!ObjectId.isValid(purchaseData.foodId)) {
-    //       return res.status(400).json({ error: "Invalid foodId" });
-    //     }
-
-    //     // Insert the purchase data into the Purchase collection
-    //     await purchaseCollection.insertOne(purchaseData);
-
-    //     // Increment purchase count for the corresponding food item
-    //     await foodCollection.updateOne(
-    //       { _id: new ObjectId(purchaseData.foodId) },
-    //       { $inc: { purchaseCount: 1 } }
-    //     );
-
-    //     res.status(201).json({ message: "Purchase data added successfully" });
-    //   } catch (error) {
-    //     console.error("Error adding purchase data:", error);
-    //     res.status(500).json({ error: "Internal Server Error" });
-    //   }
-    // });
-
     // my purchase
-
     app.post("/purchase", async (req, res) => {
       try {
         const purchaseData = req.body;
@@ -168,11 +143,33 @@ async function run() {
       }
 
       try {
-        const myAddedFoods = await purchaseCollection.find(query).toArray();
-        res.json(myAddedFoods);
+        const myPurchaseFoods = await purchaseCollection.find(query).toArray();
+        res.json(myPurchaseFoods);
       } catch (error) {
-        console.error("Error fetching user's added foods:", error);
+        console.error("Error fetching my Purchase foods:", error);
         res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
+
+    // delete from my purchase
+    app.post("/myPurchase/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        console.log("delete id", id);
+        const query = { _id: new ObjectId(id) };
+
+        const deletedPurchase = await purchaseCollection.findOne(query);
+        const deletedQuantity = parseInt(deletedPurchase.quantity);
+
+        await foodCollection.updateOne(
+          { _id: new ObjectId(deletedPurchase.foodId) },
+          { $inc: { quantity: deletedQuantity } }
+        );
+        const result = await purchaseCollection.deleteOne(query);
+        res.send(result);
+      } catch (error) {
+        console.error("Error deleting food item:", error);
+        res.status(500).send("Error deleting food item");
       }
     });
 
