@@ -18,15 +18,39 @@ app.use(
   })
 );
 app.use(express.json());
-const uri = process.env.MONGODB;
+const url = process.env.MONGODB;
 
-const client = new MongoClient(uri, {
+const client = new MongoClient(url, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
   },
 });
+
+//middlewares
+const logger = (req, res, next) => {
+  console.log("Logger Info", req.method, req.url);
+  next();
+};
+
+const verifyToken = (req, res, next) => {
+  const token = req?.cookies?.token;
+
+  if (!token) {
+    return res.status(401).send({ message: "Unauthorized access" });
+  }
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ message: "Unauthorized access" });
+    }
+    req.user = decoded;
+    next();
+  });
+  //   console.log("token in the middleware: ", token);
+  //   next();
+};
 
 async function run() {
   try {
@@ -43,6 +67,33 @@ async function run() {
     const feedbackCollection = client
       .db("restaurantManagement")
       .collection("feedbacks");
+
+    //jwt api
+
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      console.log("User token:", user);
+
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "none",
+        })
+        .send({ success: true });
+    });
+
+    //cookie clear
+
+    app.post("/logout", async (req, res) => {
+      const user = req.body;
+      console.log("Logout user", user);
+      res.clearCookie("token", { maxAge: 0 }).send({ success: true });
+    });
+
     //get top selling foods
     app.get("/topFoods", async (req, res) => {
       try {
@@ -119,29 +170,19 @@ async function run() {
     });
 
     // my purchase
-    app.post("/purchase", async (req, res) => {
+    app.post("/purchase", logger, async (req, res) => {
       try {
         const purchaseData = req.body;
-
         if (!ObjectId.isValid(purchaseData.foodId)) {
           return res.status(400).json({ error: "Invalid foodId" });
         }
-
         const foodId = new ObjectId(purchaseData.foodId);
-
-        // Get the food item details
         const foodItem = await foodCollection.findOne({ _id: foodId });
-
-        // Check if the quantity of the food item is sufficient for the purchase
         if (foodItem.quantity < purchaseData.quantity) {
           return res.status(400).json({ error: "Insufficient quantity" });
         }
-
-        // Calculate the total sales
-        // const totalSales = foodItem.totalSeals + purchaseData.quantity;
         const purchaseQuantity = parseInt(purchaseData.quantity);
 
-        // Increment purchase count for the corresponding food item
         await foodCollection.updateOne(
           { _id: foodId },
           {
@@ -154,8 +195,6 @@ async function run() {
             },
           }
         );
-
-        // Insert the purchase data into the Purchase collection
         await purchaseCollection.insertOne(purchaseData);
 
         res.status(201).json({ message: "Purchase data added successfully" });
@@ -165,16 +204,20 @@ async function run() {
       }
     });
 
-    app.get("/myPurchase", async (req, res) => {
+    app.get("/myPurchase", logger, verifyToken, async (req, res) => {
       let query = {};
       const { buyerName, buyerProfileUrl, buyerEmail } = req.query;
-
-      if (buyerName && buyerProfileUrl) {
+      console.log("Cookeis: ", req.cookies);
+      console.log("token owner: ", req.user);
+      if (
+        req.user.username === buyerName &&
+        req.user.photoURL === buyerProfileUrl
+      ) {
         query = { buyerName, buyerProfileUrl };
-      } else if (buyerEmail !== undefined) {
+      } else if ((req.user.email === buyerEmail) !== undefined) {
         query = { buyerEmail };
       } else {
-        return res.json([]);
+        return res.status(403).send({ message: "Forbidden access" });
       }
 
       try {
@@ -190,7 +233,6 @@ async function run() {
     app.post("/myPurchase/:id", async (req, res) => {
       try {
         const id = req.params.id;
-        console.log("delete id", id);
         const query = { _id: new ObjectId(id) };
 
         const deletedPurchase = await purchaseCollection.findOne(query);
