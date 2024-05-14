@@ -82,6 +82,31 @@ async function run() {
       const result = await foodCollection.findOne(query);
       res.send(result);
     });
+
+    // update food
+    app.post("/updateFood/:id", async (req, res) => {
+      try {
+        const foodId = req.params.id;
+        const updatedFoodData = req.body;
+        if (!ObjectId.isValid(foodId)) {
+          return res.status(400).json({ error: "Invalid foodId" });
+        }
+        const { _id, ...updatedDataWithoutId } = updatedFoodData;
+        const query = { _id: new ObjectId(foodId) };
+        const result = await foodCollection.updateOne(query, {
+          $set: updatedDataWithoutId,
+        });
+        if (result.modifiedCount === 0) {
+          return res.status(404).json({ error: "Food item not found" });
+        }
+
+        res.json({ message: "Food item updated successfully" });
+      } catch (error) {
+        console.error("Error updating food item:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
+
     app.post("/addFood", async (req, res) => {
       const newFood = req.body;
       try {
