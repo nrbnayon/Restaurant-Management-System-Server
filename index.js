@@ -68,6 +68,10 @@ async function run() {
       .db("restaurantManagement")
       .collection("feedbacks");
 
+    const galleryCollection = client
+      .db("restaurantManagement")
+      .collection("Gallery");
+
     //jwt api
 
     app.post("/jwt", async (req, res) => {
@@ -135,7 +139,7 @@ async function run() {
     });
 
     // update food
-    app.post("/updateFood/:id", async (req, res) => {
+    app.post("/updateFood/:id", logger, verifyToken, async (req, res) => {
       try {
         const foodId = req.params.id;
         const updatedFoodData = req.body;
@@ -170,7 +174,7 @@ async function run() {
     });
 
     // my purchase
-    app.post("/purchase", logger, async (req, res) => {
+    app.post("/purchase", logger, verifyToken, async (req, res) => {
       try {
         const purchaseData = req.body;
         if (!ObjectId.isValid(purchaseData.foodId)) {
@@ -207,8 +211,8 @@ async function run() {
     app.get("/myPurchase", logger, verifyToken, async (req, res) => {
       let query = {};
       const { buyerName, buyerProfileUrl, buyerEmail } = req.query;
-      console.log("Cookeis: ", req.cookies);
-      console.log("token owner: ", req.user);
+      // console.log("Cookeis: ", req.cookies);
+      // console.log("token owner: ", req.user);
       if (
         req.user.username === buyerName &&
         req.user.photoURL === buyerProfileUrl
@@ -230,7 +234,7 @@ async function run() {
     });
 
     // delete from my purchase
-    app.post("/myPurchase/:id", async (req, res) => {
+    app.post("/myPurchase/:id", logger, verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
@@ -260,7 +264,7 @@ async function run() {
       res.json({ message: "Feedback added" });
     });
 
-    app.get("/myAddedFoods", async (req, res) => {
+    app.get("/myAddedFoods", logger, verifyToken, async (req, res) => {
       let query = {};
       const { userName, photoUrl, userEmail } = req.query;
 
@@ -282,7 +286,7 @@ async function run() {
     });
 
     //delete added food
-    app.post("/myAddedFoods/:id", async (req, res) => {
+    app.post("/myAddedFoods/:id", logger, verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         console.log("delete id", id);
@@ -294,6 +298,17 @@ async function run() {
         console.error("Error deleting food item:", error);
         res.status(500).send("Error deleting food item");
       }
+    });
+
+    //Gallery
+    app.get("/gallery", async (req, res) => {
+      const galleryItem = await galleryCollection.find().toArray();
+      res.json(galleryItem);
+    });
+
+    app.post("/gallery", async (req, res) => {
+      await galleryCollection.insertOne(req.body);
+      res.json({ message: "Feedback and Image added" });
     });
 
     // Send a ping to confirm a successful connection
