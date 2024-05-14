@@ -82,6 +82,16 @@ async function run() {
       const result = await foodCollection.findOne(query);
       res.send(result);
     });
+    app.post("/addFood", async (req, res) => {
+      const newFood = req.body;
+      try {
+        const result = await foodCollection.insertOne(newFood);
+        res.json(result);
+      } catch (error) {
+        console.error("Error:", error);
+        res.status(500).json({ error: "Error" });
+      }
+    });
 
     // my purchase
     app.post("/purchase", async (req, res) => {
