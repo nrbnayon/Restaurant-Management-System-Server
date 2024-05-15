@@ -56,6 +56,8 @@ async function run() {
   try {
     await client.connect();
 
+    // Database Collection
+
     const foodCollection = client
       .db("restaurantManagement")
       .collection("foods");
@@ -94,7 +96,7 @@ async function run() {
 
     app.post("/logout", async (req, res) => {
       const user = req.body;
-      console.log("Logout user", user);
+      // console.log("Logout user", user);
       res.clearCookie("token", { maxAge: 0 }).send({ success: true });
     });
 
@@ -162,7 +164,7 @@ async function run() {
       }
     });
 
-    app.post("/addFood", async (req, res) => {
+    app.post("/addFood", logger, verifyToken, async (req, res) => {
       const newFood = req.body;
       try {
         const result = await foodCollection.insertOne(newFood);
